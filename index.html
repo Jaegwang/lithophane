@@ -13,9 +13,14 @@
     <div id="info">
       <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
       webgl - exporter - stl<br /><br />
-      <button id="exportASCII">export ASCII</button>
+
+      <button id="generateMesh">generate mesh</button>
       <button id="exportBinary">export binary</button>
+      <button id="exportASCII">export ASCII</button>
+
     </div>
+
+    <canvas id = "ImageCanvas" width="1000" height="500"></canvas>
 
     <script type="module">
       import * as THREE from "https://threejs.org/build/three.module.js";
@@ -25,10 +30,73 @@
 
       import { WEBGL } from "https://threejs.org/examples/jsm/WebGL.js";
 
-      let scene, camera, renderer, exporter, mesh, cylinderMesh;
+      let imageData, imageWidth, imageHeight;
+      let scene, camera, renderer, exporter, cylinderMesh;
+
 
       init();
       animate();
+
+
+      loadImage();
+
+      function onLoadedImage(imageObject) {
+
+        console.log('Start Image');
+
+        var canvas = document.getElementById("ImageCanvas");
+
+        imageWidth = 1000;
+        imageHeight = 500;
+
+        var context = canvas.getContext('2d');
+        context.drawImage(imageObject, 0, 0, 1000, 500)
+
+
+        console.log(imageObject.width);
+        console.log(imageObject.height);
+
+        imageData = context.getImageData(0, 0, imageWidth, imageHeight);
+
+        var data = imageData.data;
+
+        console.log(imageData.width);
+        console.log(imageData.height);
+
+        console.log('Loaded Image');
+      }
+
+
+      function loadImage() {
+
+        var imageObject = new Image();
+        imageObject.crossOrigin = '';
+
+
+        imageObject.onload = function () {
+          onLoadedImage(this);
+        }
+
+        var url = 'pictures/test_image.png'
+        imageObject.src = url;
+      }
+
+      function getGrayscaleValue(inImageData, i, j)
+      {
+        if( inImageData.width <= i || inImageData.height <= j)
+        {
+          return 0.0;
+        }
+
+        const index = j*inImageData.width + i;
+
+        const r = inImageData.data[index*4 + 0] / 255;
+        const g = inImageData.data[index*4 + 1] / 255;
+        const b = inImageData.data[index*4 + 2] / 255;
+        const a = inImageData.data[index*4 + 3] / 255;
+
+        return (0.299*r) + (0.587*g) + (0.114*b);
+      }
 
       function init() {
         camera = new THREE.PerspectiveCamera(
@@ -75,137 +143,7 @@
         grid.material.transparent = true;
         scene.add(grid);
 
-        // export mesh
 
-        const geometry = new THREE.BoxGeometry(50, 50, 50);
-        const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-
-        mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = true;
-        mesh.position.y = 25;
-        //scene.add( mesh );
-
-        //
-        // https://threejsfundamentals.org/threejs/lessons/threejs-custom-buffergeometry.html
-        // https://github.com/mrdoob/three.js/blob/master/examples/webgl2_buffergeometry_attributes_integer.html
-
-        const customGeometry = new THREE.BufferGeometry();
-
-        const positions = [];
-        const indices = [];
-
-        const iRes = 100;
-        const jRes = 100;
-
-        const cylinderRadius = 70;
-        const cylinderHight = 140;
-
-        const thick = 2;
-
-        var startIndex = positions.length / 3;
-
-        console.log(startIndex);
-
-        for (var j = 0; j < jRes; ++j) {
-          var y = (cylinderHight / jRes) * j;
-
-          for (var i = 0; i < iRes; ++i) {
-            const rad = ((Math.PI * 2) / iRes) * i;
-
-            var x = Math.cos(rad) * cylinderRadius;
-            var z = Math.sin(rad) * cylinderRadius;
-
-            positions.push(x, y, z);
-
-            if (j < jRes - 1) {
-              var i1 = i + 1 == iRes ? 0 : i + 1;
-              var j1 = j + 1 == jRes ? 0 : j + 1;
-
-              indices.push(
-                startIndex + (i + j * iRes),
-                startIndex + (i1 + j * iRes),
-                startIndex + (i + j1 * iRes)
-              );
-              indices.push(
-                startIndex + (i + j1 * iRes),
-                startIndex + (i1 + j * iRes),
-                startIndex + (i1 + j1 * iRes)
-              );
-            }
-          }
-        }
-
-        var startIndex = positions.length / 3;
-        console.log(startIndex);
-
-        for (var j = 0; j < jRes; ++j) {
-          var y = (cylinderHight / jRes) * j;
-
-          for (var i = 0; i < iRes; ++i) {
-            const rad = ((Math.PI * 2) / iRes) * i;
-
-            var x = Math.cos(rad) * (cylinderRadius + thick);
-            var z = Math.sin(rad) * (cylinderRadius + thick);
-
-            positions.push(x, y, z);
-
-            if (j < jRes - 1) {
-              var i1 = i + 1 == iRes ? 0 : i + 1;
-              var j1 = j + 1 == jRes ? 0 : j + 1;
-
-              indices.push(
-                startIndex + (i + j * iRes),
-                startIndex + (i + j1 * iRes),
-                startIndex + (i1 + j * iRes)
-              );
-              indices.push(
-                startIndex + (i + j1 * iRes),
-                startIndex + (i1 + j1 * iRes),
-                startIndex + (i1 + j * iRes)
-              );
-            }
-          }
-        }
-
-        const stride = iRes * jRes;
-
-        for (var i = 0; i < iRes; ++i) {
-          var i1 = i + 1 == iRes ? 0 : i + 1;
-
-          indices.push(i, i + stride, i1);
-          indices.push(i + stride, i1 + stride, i1);
-
-          var j = jRes - 1;
-
-          indices.push(j * iRes + i, j * iRes + i1, j * iRes + i + stride);
-          indices.push(
-            j * iRes + i + stride,
-            j * iRes + i1,
-            j * iRes + i1 + stride
-          );
-        }
-
-        // itemSize = 3 because there are 3 values (components) per vertex
-        customGeometry.setAttribute(
-          "position",
-          new THREE.Float32BufferAttribute(positions, 3)
-        );
-
-        customGeometry.setIndex(indices);
-
-        const customMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-        const wireframeMaterial = new THREE.MeshBasicMaterial({
-          color: 0x00ff00,
-          wireframe: true
-        });
-
-        cylinderMesh = new THREE.Mesh(customGeometry, wireframeMaterial);
-
-        cylinderMesh.castShadow = true;
-
-        scene.add(cylinderMesh);
-
-        //
 
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -228,6 +166,9 @@
 
         const buttonExportBinary = document.getElementById("exportBinary");
         buttonExportBinary.addEventListener("click", exportBinary);
+
+        const buttonGenerate = document.getElementById("generateMesh");
+        buttonGenerate.addEventListener("click", generateMesh);
       }
 
       function onWindowResize() {
@@ -250,6 +191,132 @@
       function exportBinary() {
         const result = exporter.parse(cylinderMesh, { binary: true });
         saveArrayBuffer(result, "box.stl");
+      }
+
+      function generateMesh() {
+
+        // https://threejsfundamentals.org/threejs/lessons/threejs-custom-buffergeometry.html
+        // https://github.com/mrdoob/three.js/blob/master/examples/webgl2_buffergeometry_attributes_integer.html
+
+        const customGeometry = new THREE.BufferGeometry();
+
+        const positions = [];
+        const indices = [];
+
+        const iRes = 1000;
+        const jRes = 500;
+
+        const cylinderRadius = 70;
+        const cylinderHeight = 140;
+
+        const thick = 1.5;
+
+        var startIndex = positions.length / 3;
+
+        console.log(startIndex);
+
+        for (var j = 0; j < jRes; ++j) {
+          var y = (cylinderHeight / jRes) * j;
+
+          for (var i = 0; i < iRes; ++i) {
+            const rad = ((Math.PI * 2) / iRes) * i;
+
+            var x = Math.cos(rad) * cylinderRadius;
+            var z = Math.sin(rad) * cylinderRadius;
+
+            positions.push(x, y, z);
+
+            if (j < jRes - 1) {
+              var i1 = i + 1 == iRes ? 0 : i + 1;
+              var j1 = j + 1 == jRes ? 0 : j + 1;
+
+              indices.push(
+                      startIndex + (i + j * iRes),
+                      startIndex + (i1 + j * iRes),
+                      startIndex + (i + j1 * iRes)
+              );
+              indices.push(
+                      startIndex + (i + j1 * iRes),
+                      startIndex + (i1 + j * iRes),
+                      startIndex + (i1 + j1 * iRes)
+              );
+            }
+          }
+        }
+
+        var startIndex = positions.length / 3;
+        console.log(startIndex);
+
+        for (var j = 0; j < jRes; ++j) {
+          var y = (cylinderHeight / jRes) * j;
+
+          for (var i = 0; i < iRes; ++i) {
+            const rad = ((Math.PI * 2) / iRes) * i;
+
+            var h = (1.0 - getGrayscaleValue(imageData, iRes-1-i, jRes-1-j)) * 2.0;
+
+            var x = Math.cos(rad) * (cylinderRadius + thick + h);
+            var z = Math.sin(rad) * (cylinderRadius + thick + h);
+
+            positions.push(x, y, z);
+
+            if (j < jRes - 1) {
+              var i1 = i + 1 == iRes ? 0 : i + 1;
+              var j1 = j + 1 == jRes ? 0 : j + 1;
+
+              indices.push(
+                      startIndex + (i + j * iRes),
+                      startIndex + (i + j1 * iRes),
+                      startIndex + (i1 + j * iRes)
+              );
+              indices.push(
+                      startIndex + (i + j1 * iRes),
+                      startIndex + (i1 + j1 * iRes),
+                      startIndex + (i1 + j * iRes)
+              );
+            }
+          }
+        }
+
+        const stride = iRes * jRes;
+
+        for (var i = 0; i < iRes; ++i) {
+          var i1 = i + 1 == iRes ? 0 : i + 1;
+
+          indices.push(i, i + stride, i1);
+          indices.push(i + stride, i1 + stride, i1);
+
+          var j = jRes - 1;
+
+          indices.push(j * iRes + i, j * iRes + i1, j * iRes + i + stride);
+          indices.push(
+                  j * iRes + i + stride,
+                  j * iRes + i1,
+                  j * iRes + i1 + stride
+          );
+        }
+
+        // itemSize = 3 because there are 3 values (components) per vertex
+        customGeometry.setAttribute(
+                "position",
+                new THREE.Float32BufferAttribute(positions, 3)
+        );
+
+        customGeometry.setIndex(indices);
+
+        const customMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+        const wireframeMaterial = new THREE.MeshBasicMaterial({
+          color: 0x00ff00,
+          wireframe: true
+        });
+
+        cylinderMesh = new THREE.Mesh(customGeometry, wireframeMaterial);
+
+        cylinderMesh.castShadow = true;
+
+        scene.add(cylinderMesh);
+
+
       }
 
       const link = document.createElement("a");
